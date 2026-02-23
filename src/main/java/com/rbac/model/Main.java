@@ -89,5 +89,81 @@ public class Main {
         System.out.println("isActive(): " + tempPast.isActive());
         System.out.println("isAutoRenew(): " + tempPast.isAutoRenew());
         System.out.println("getTimeRemaining(): " + tempPast.getTimeRemaining());
+
+        System.out.println("\ntesting user manager\n");
+
+        UserManager userManager = new UserManager();
+
+        System.out.println("Adding users:");
+        userManager.add(u1);
+        userManager.add(User.create("jane_smith", "Jane Smith", "jane@work.com"));
+        userManager.add(User.create("bob_wilson", "Bob Wilson", "bob@gmail.com"));
+        System.out.println("Total users: " + userManager.count());
+
+        System.out.println("\nCheck exists:");
+        System.out.println("john_doe exists? " + userManager.exists("john_doe"));
+        System.out.println("unknown exists? " + userManager.exists("unknown"));
+
+        System.out.println("\nFind by username:");
+        userManager.findByUsername("jane_smith")
+                .ifPresentOrElse(
+                        user -> System.out.println("Found: " + user.format()),
+                        () -> System.out.println("Not found")
+                );
+
+        System.out.println("\nFind by email:");
+        userManager.findByEmail("bob@gmail.com")
+                .ifPresent(user -> System.out.println("Found: " + user.format()));
+
+        System.out.println("\nFilter by email domain '@gmail.com':");
+        UserFilter gmailFilter = UserFilters.byEmailDomain("@gmail.com");
+        userManager.findByFilter(gmailFilter)
+                .forEach(user -> System.out.println(" - " + user.format()));
+
+        System.out.println("\nFilter by username contains 'john':");
+        UserFilter nameFilter = UserFilters.byUsernameContains("john");
+        userManager.findByFilter(nameFilter)
+                .forEach(user -> System.out.println(" - " + user.format()));
+
+        System.out.println("\nFilter (username contains 'j' AND email domain '@work.com'):");
+        UserFilter complex = UserFilters.byUsernameContains("j")
+                .and(UserFilters.byEmailDomain("@work.com"));
+        userManager.findByFilter(complex)
+                .forEach(user -> System.out.println(" - " + user.format()));
+
+        System.out.println("\nAll users sorted by username:");
+        userManager.findAll(null, UserSorters.byUsername())
+                .forEach(user -> System.out.println(" - " + user.format()));
+
+        System.out.println("\nAll users sorted by email:");
+        userManager.findAll(null, UserSorters.byEmail())
+                .forEach(user -> System.out.println(" - " + user.format()));
+
+        System.out.println("\nGmail users sorted by full name:");
+        userManager.findAll(gmailFilter, UserSorters.byFullName())
+                .forEach(user -> System.out.println(" - " + user.format()));
+
+        System.out.println("\nUpdating user:");
+        System.out.println("Before: " + userManager.findByUsername("bob_wilson").get().format());
+        userManager.update("bob_wilson", "Robert Wilson", "robert@gmail.com");
+        System.out.println("After: " + userManager.findByUsername("bob_wilson").get().format());
+
+        System.out.println("\nRemoving user:");
+        User toRemove = userManager.findByUsername("jane_smith").get();
+        userManager.remove(toRemove);
+        System.out.println("After removal, total users: " + userManager.count());
+
+        System.out.println("\nError handling:");
+        try {
+            userManager.add(u1); // пытаемся добавить существующего
+        } catch (IllegalArgumentException e) {
+            System.out.println("Expected error: " + e.getMessage());
+        }
+
+        try {
+            userManager.update("unknown", "New Name", "new@email.com");
+        } catch (IllegalArgumentException e) {
+            System.out.println("Expected error: " + e.getMessage());
+        }
     }
 }
