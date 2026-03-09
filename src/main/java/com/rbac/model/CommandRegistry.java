@@ -38,24 +38,30 @@ public class CommandRegistry {
             }
         });
 
-        parser.registerCommand("user-view", "View user details and permissions", (scanner, system) -> {
+        parser.registerCommand("user-view", "View user profile and active roles", (scanner, system) -> {
             System.out.print("Enter username: ");
             String username = scanner.next();
 
-            system.getUserManager().findById(username).ifPresentOrElse(user -> {
+            system.getUserManager().findByUsername(username).ifPresentOrElse(user -> {
                 System.out.println("\n--- User Profile ---");
                 System.out.println(user.format());
 
-                var userAssignments = system.getAssignmentManager().findAll().stream()
-                        .filter(a -> a.user().username().equals(user.username()))
-                        .toList();
+                var activeFilter = AssignmentFilters.byUsername(username)
+                        .and(AssignmentFilters.activeOnly());
 
-                System.out.println("Roles: " + (userAssignments.isEmpty() ? "None" : ""));
-                userAssignments.forEach(a -> System.out.println("  - " + a.role().getName()));
+                var activeAssignments = system.getAssignmentManager().findByFilter(activeFilter);
+
+                System.out.println("Active Roles: ");
+                if (activeAssignments.isEmpty()) {
+                    System.out.println("  - No active roles found");
+                } else {
+                    activeAssignments.forEach(a ->
+                            System.out.println("  - " + a.role().getName() + " [" + a.assignmentType() + "]")
+                    );
+                }
 
                 var permissions = system.getAssignmentManager().getUserPermissions(user);
-                System.out.println("Total Permissions: " + permissions.size());
-                permissions.forEach(p -> System.out.println("  * " + p.name() + " on " + p.resource()));
+                System.out.println("Total Active Permissions: " + permissions.size());
 
             }, () -> System.out.println("Error: User not found."));
         });
@@ -235,10 +241,178 @@ public class CommandRegistry {
             }, () -> System.out.println("Error: Role '" + name + "' not found."));
         });
 
+        parser.registerCommand("assign-role", "Assign a role to a user", (scanner, system) -> {
+            System.out.print("Enter username: ");
+            String username = scanner.next();
 
+            System.out.print("Enter role name: ");
+            String roleName = scanner.next();
 
+            var userOpt = system.getUserManager().findByUsername(username);
+            var roleOpt = system.getRoleManager().findByName(roleName);
 
+            if (userOpt.isEmpty()) {
+                System.out.println("Error: User not found.");
+                return;
+            }
+            if (roleOpt.isEmpty()) {
+                System.out.println("Error: Role not found.");
+                return;
+            }
 
+            User user = userOpt.get();
+            Role role = roleOpt.get();
+
+            System.out.print("Assignment type (1: Permanent, 2: Temporary): ");
+            int type = scanner.nextInt();
+
+            System.out.print("Enter your name (Assigner): ");
+            String assigner = scanner.next();
+
+            System.out.print("Reason for assignment: ");
+            scanner.nextLine();
+            String reason = scanner.nextLine();
+
+            AssignmentMetadata metadata = AssignmentMetadata.now(assigner, reason);
+            RoleAssignment assignment;
+
+            try {
+                if (type == 1) {
+                    assignment = new PermanentAssignment(user, role, metadata);
+                } else if (type == 2) {
+                    System.out.print("Enter expiration date (YYYY-MM-DD): ");
+                    String expiryDate = scanner.next();
+                    assignment = new TemporaryAssignment(user, role, metadata, expiryDate, false);
+                } else {
+                    System.out.println("Error: Invalid assignment type.");
+                    return;
+                }
+
+                system.getAssignmentManager().add(assignment);
+                System.out.println("Success: Role '" + roleName + "' assigned to '" + username + "' (" + assignment.assignmentType() + ").");
+
+            } catch (Exception e) {
+                System.out.println("Error: " + e.getMessage());
+            }
+        });
+
+        parser.registerCommand("revoke-role", "Revoke an active role from a user", (scanner, system) -> {
+            System.out.print("Enter username: ");
+            String username = scanner.next();
+
+            var userOpt = system.getUserManager().findByUsername(username);
+            if (userOpt.isEmpty()) {
+                System.out.println("Error: User not found.");
+                return;
+            }
+
+            var activeFilter = AssignmentFilters.byUsername(username)
+                    .and(AssignmentFilters.activeOnly());
+
+            var activeAssignments = system.getAssignmentManager().findAll().stream()
+                    .filter(activeFilter::test)
+                    .toList();
+
+            if (activeAssignments.isEmpty()) {
+                System.out.println("User '" + username + "' has no active assignments.");
+                return;
+            }
+
+            System.out.println("\nActive assignments for " + username + ":");
+            for (int i = 0; i < activeAssignments.size(); i++) {
+                var a = activeAssignments.get(i);
+                String typeInfo = a.assignmentType();
+                if (a instanceof TemporaryAssignment ta) {
+                    typeInfo += " (Expires: " + ta.getExpiresAt() + ")";
+                }
+                System.out.printf("%d. Role: %-15s | Type: %s%n", i + 1, a.role().getName(), typeInfo);
+            }
+
+            System.out.print("\nSelect assignment to revoke (1-" + activeAssignments.size() + ") or 0 to cancel: ");
+            int choice = scanner.nextInt();
+
+            if (choice <= 0 || choice > activeAssignments.size()) {
+                System.out.println("Operation cancelled.");
+                return;
+            }
+
+            RoleAssignment selected = activeAssignments.get(choice - 1);
+
+            try {
+                if (selected instanceof PermanentAssignment) {
+                    system.getAssignmentManager().revokeAssignment(selected.assignmentId());
+                    System.out.println("Success: Permanent role '" + selected.role().getName() + "' revoked.");
+                }
+                else if (selected instanceof TemporaryAssignment ta) {
+                    String pastDate = java.time.LocalDate.now().minusDays(1).toString();
+                    system.getAssignmentManager().extendTemporaryAssignment(selected.assignmentId(), pastDate);
+                    System.out.println("Success: Temporary role '" + selected.role().getName() + "' expired manually.");
+                }
+
+                System.out.println("Original " + selected.metadata().format());
+
+            } catch (Exception e) {
+                System.out.println("Error during revocation: " + e.getMessage());
+            }
+        });
+
+        parser.registerCommand("assignments-list", "Show all role assignments", (scanner, system) -> {
+            var assignments = system.getAssignmentManager().findAll();
+
+            if (assignments.isEmpty()) {
+                System.out.println("No assignments in the system.");
+                return;
+            }
+
+            System.out.println("\n" + "=".repeat(95));
+            System.out.printf("%-15s | %-15s | %-12s | %-10s | %-25s%n",
+                    "USERNAME", "ROLE", "TYPE", "STATUS", "ASSIGNED AT");
+            System.out.println("-".repeat(95));
+
+            assignments.stream()
+                    .sorted(AssignmentSorters.byUsername())
+                    .forEach(a -> {
+                        String status = a.isActive() ? "ACTIVE" : "INACTIVE";
+
+                        String typeDisplay = a.assignmentType();
+                        if (a instanceof TemporaryAssignment ta) {
+                            typeDisplay += " (" + ta.getExpiresAt() + ")";
+                        }
+
+                        System.out.printf("%-15s | %-15s | %-12s | %-10s | %-25s%n",
+                                a.user().username(),
+                                a.role().getName(),
+                                typeDisplay,
+                                status,
+                                a.metadata().assignedAt());
+                    });
+            System.out.println("=".repeat(95));
+        });
+
+        parser.registerCommand("help", "Show all available commands", (scanner, system) -> {
+            parser.printHelp();
+        });
+
+        parser.registerCommand("stats", "Show system statistics", (scanner, system) -> {
+            System.out.println(system.generateStatistics());
+        });
+
+        parser.registerCommand("clear", "Clear the console screen", (scanner, system) -> {
+            System.out.print("\033[H\033[2J");
+            System.out.flush();
+        });
+
+        parser.registerCommand("exit", "Terminate the application", (scanner, system) -> {
+            System.out.print("Do you really want to exit? (y/n): ");
+            String response = scanner.next().toLowerCase();
+
+            if (response.equals("y") || response.equals("yes")) {
+                System.out.println("Closing RBAC system.");
+                System.exit(0);
+            } else {
+                System.out.println("Exit aborted.");
+            }
+        });
 
     }
 }

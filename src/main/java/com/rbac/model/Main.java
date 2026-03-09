@@ -20,16 +20,6 @@ public class Main {
 
             String input = scanner.nextLine().trim();
 
-            if (input.equalsIgnoreCase("exit")) {
-                System.out.println("Exiting system...");
-                break;
-            }
-
-            if (input.equalsIgnoreCase("help")) {
-                parser.printHelp();
-                continue;
-            }
-
             parser.parseAndExecute(input, scanner, system);
         }
 
