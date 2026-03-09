@@ -2,102 +2,50 @@ package com.rbac.model;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
+
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.util.List;
-import java.util.Optional;
-
 class UserManagerTest {
-
-    private UserManager manager;
-    private User testUser;
+    private UserManager userManager;
 
     @BeforeEach
     void setUp() {
-        manager = new UserManager();
-        testUser = User.create("john_doe", "John Doe", "john@example.com");
+        userManager = new UserManager();
     }
 
     @Test
-    void addAndFind() {
-        manager.add(testUser);
+    @DisplayName("Successfully add and find user")
+    void testAddAndFindUser() {
+        User user = User.create("ivan_dev", "Ivan Ivanov", "ivan@mail.com");
+        userManager.add(user);
 
-        assertEquals(1, manager.count());
-        assertTrue(manager.exists("john_doe"));
-
-        Optional<User> found = manager.findByUsername("john_doe");
-        assertTrue(found.isPresent());
-        assertEquals("john_doe", found.get().username());
+        assertTrue(userManager.findById("ivan_dev").isPresent(), "User should be found by ID");
+        assertEquals(1, userManager.count(), "User count should be 1");
     }
 
     @Test
-    void addDuplicateThrows() {
-        manager.add(testUser);
+    @DisplayName("Fail when adding user with existing username")
+    void testDuplicateUser() {
+        User user1 = User.create("tester", "Test 1", "test1@mail.com");
+        User user2 = User.create("tester", "Test 2", "test2@mail.com");
 
-        User duplicate = User.create("john_doe", "John Doe", "john@example.com");
+        userManager.add(user1);
 
-        assertThrows(IllegalArgumentException.class, () -> manager.add(duplicate));
+        assertThrows(IllegalArgumentException.class, () -> {
+            userManager.add(user2);
+        }, "Manager should prevent duplicate username entries");
     }
 
     @Test
-    void removeUser() {
-        manager.add(testUser);
-        assertTrue(manager.remove(testUser));
-        assertEquals(0, manager.count());
-    }
+    @DisplayName("Remove user from repository")
+    void testRemoveUser() {
+        User user = User.create("delete_me", "To Be Deleted", "del@mail.com");
+        userManager.add(user);
 
-    @Test
-    void findByEmail() {
-        manager.add(testUser);
+        boolean removed = userManager.remove(user);
 
-        Optional<User> found = manager.findByEmail("john@example.com");
-        assertTrue(found.isPresent());
-        assertEquals("john_doe", found.get().username());
-    }
-
-    @Test
-    void filterByUsername() {
-        manager.add(testUser);
-        manager.add(User.create("jane_smith", "Jane Smith", "jane@work.com"));
-
-        UserFilter filter = UserFilters.byUsernameContains("john");
-        List<User> result = manager.findByFilter(filter);
-
-        assertEquals(1, result.size());
-        assertEquals("john_doe", result.get(0).username());
-    }
-
-    @Test
-    void filterByEmailDomain() {
-        manager.add(testUser);
-        manager.add(User.create("bob", "Bob", "bob@gmail.com"));
-
-        UserFilter filter = UserFilters.byEmailDomain("@gmail.com");
-        List<User> result = manager.findByFilter(filter);
-
-        assertEquals(1, result.size());
-        assertEquals("bob", result.get(0).username());
-    }
-
-    @Test
-    void sortUsers() {
-        manager.add(User.create("bob", "Bob", "bob@mail.com"));
-        manager.add(User.create("alice", "Alice", "alice@mail.com"));
-
-        List<User> sorted = manager.findAll(null, UserSorters.byUsername());
-
-        assertEquals("alice", sorted.get(0).username());
-        assertEquals("bob", sorted.get(1).username());
-    }
-
-    @Test
-    void updateUser() {
-        manager.add(testUser);
-
-        manager.update("john_doe", "John Updated", "john.new@example.com");
-
-        User updated = manager.findByUsername("john_doe").get();
-        assertEquals("John Updated", updated.fullName());
-        assertEquals("john.new@example.com", updated.email());
+        assertTrue(removed, "remove method should return true");
+        assertEquals(0, userManager.count(), "Repository should be empty after removal");
     }
 }

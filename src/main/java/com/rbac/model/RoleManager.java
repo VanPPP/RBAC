@@ -8,7 +8,6 @@ public class RoleManager implements Repository<Role> {
     private final Map<String, Role> rolesById = new HashMap<>();
     private final Map<String, Role> rolesByName = new HashMap<>();
 
-    // Для проверки назначений при удалении
     private Predicate<Role> hasAssignments = null;
 
     public void setHasAssignmentsChecker(Predicate<Role> checker) {
@@ -37,7 +36,6 @@ public class RoleManager implements Repository<Role> {
     public boolean remove(Role role) {
         if (role == null) return false;
 
-        // Проверяем, не назначена ли роль пользователям
         if (hasAssignments != null && hasAssignments.test(role)) {
             throw new IllegalStateException("Cannot remove role that is assigned to users");
         }

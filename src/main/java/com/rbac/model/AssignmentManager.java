@@ -14,6 +14,13 @@ public class AssignmentManager implements Repository<RoleAssignment> {
         if (assignments.containsKey(assignment.assignmentId())) {
             throw new IllegalArgumentException("Assignment ID already exists");
         }
+        boolean alreadyHasActiveRole = assignments.values().stream()
+                .anyMatch(a -> a.user().equals(assignment.user()) &&
+                        a.role().equals(assignment.role()) &&
+                        a.isActive());
+        if (alreadyHasActiveRole) {
+            throw new IllegalStateException("User already has this role active");
+        }
         assignments.put(assignment.assignmentId(), assignment);
     }
 
@@ -98,6 +105,7 @@ public class AssignmentManager implements Repository<RoleAssignment> {
         if (user == null || permissionName == null || resource == null) return false;
         return assignments.values().stream()
                 .filter(a -> a.user().equals(user))
+                .filter(RoleAssignment::isActive)
                 .anyMatch(a -> a.role().hasPermission(permissionName, resource));
     }
 
@@ -105,6 +113,7 @@ public class AssignmentManager implements Repository<RoleAssignment> {
         if (user == null) return Collections.emptySet();
         return assignments.values().stream()
                 .filter(a -> a.user().equals(user))
+                .filter(RoleAssignment::isActive)
                 .flatMap(a -> a.role().getPermissions().stream())
                 .collect(Collectors.toSet());
     }

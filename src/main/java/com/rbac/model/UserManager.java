@@ -14,7 +14,6 @@ public class UserManager implements Repository<User> {
         if (users.containsKey(user.username())) {
             throw new IllegalArgumentException("User with username '" + user.username() + "' already exists");
         }
-        // Переиспользуем валидацию из User.create()
         User validated = User.create(user.username(), user.fullName(), user.email());
         users.put(validated.username(), validated);
     }
