@@ -143,6 +143,101 @@ public class CommandRegistry {
             }
         });
 
+        parser.registerCommand("role-list", "Show all roles", (scanner, system) -> {
+            var roles = system.getRoleManager().findAll();
+
+            if (roles.isEmpty()) {
+                System.out.println("No roles found in the system.");
+            } else {
+                roles.sort(RoleSorters.byName());
+
+                System.out.println("\n=== Role List ===");
+                System.out.printf("%-20s | %-12s | %-36s%n", "Role Name", "Permissions", "ID");
+                System.out.println("----------------------------------------------------------------------------");
+
+                roles.forEach(role -> {
+                    System.out.printf("%-20s | %-12d | %-36s%n",
+                            role.getName(),
+                            role.getPermissions().size(),
+                            role.getId());
+                });
+            }
+        });
+
+        parser.registerCommand("role-create", "Create a new role with permissions", (scanner, system) -> {
+            System.out.print("Enter role name: ");
+            String name = scanner.next();
+
+            System.out.print("Enter description: ");
+            scanner.nextLine();
+            String description = scanner.nextLine();
+
+            try {
+                Role newRole = new Role(name, description);
+                system.getRoleManager().add(newRole);
+                System.out.println("Success: Role '" + name + "' created with ID: " + newRole.getId());
+
+                while (true) {
+                    System.out.print("\nAdd a permission to this role? (y/n): ");
+                    String choice = scanner.next().toLowerCase();
+
+                    if (!choice.equals("y")) {
+                        break;
+                    }
+
+                    System.out.print("Enter permission name (e.g., READ, WRITE): ");
+                    String pName = scanner.next();
+
+                    System.out.print("Enter resource (e.g., reports, system): ");
+                    String pResource = scanner.next();
+
+                    System.out.print("Enter permission description: ");
+                    scanner.nextLine();
+                    String pDesc = scanner.nextLine();
+
+                    Permission permission = new Permission(pName, pResource, pDesc);
+                    newRole.addPermission(permission);
+
+                    System.out.println("Permission '" + pName + "' on '" + pResource + "' added to role.");
+                }
+
+                System.out.println("\nRole creation finished. Total permissions: " + newRole.getPermissions().size());
+
+            } catch (IllegalArgumentException e) {
+                System.out.println("Error: " + e.getMessage());
+            }
+        });
+
+        parser.registerCommand("role-view", "View role details and permissions", (scanner, system) -> {
+            System.out.print("Enter role name: ");
+            String name = scanner.next();
+
+            system.getRoleManager().findByName(name).ifPresentOrElse(role -> {
+                System.out.println("\n" + role.format());
+            }, () -> System.out.println("Error: Role '" + name + "' not found."));
+        });
+
+        parser.registerCommand("role-delete", "Delete a role from system", (scanner, system) -> {
+            System.out.print("Enter role name to delete: ");
+            String name = scanner.next();
+
+            system.getRoleManager().findByName(name).ifPresentOrElse(role -> {
+                try {
+                    boolean removed = system.getRoleManager().remove(role);
+                    if (removed) {
+                        System.out.println("Success: Role '" + name + "' deleted.");
+                    } else {
+                        System.out.println("Error: Could not delete role.");
+                    }
+                } catch (IllegalStateException e) {
+                    System.out.println("Constraint Error: " + e.getMessage());
+                }
+            }, () -> System.out.println("Error: Role '" + name + "' not found."));
+        });
+
+
+
+
 
 
     }
