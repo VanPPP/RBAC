@@ -44,20 +44,106 @@ public class CommandRegistry {
 
             system.getUserManager().findById(username).ifPresentOrElse(user -> {
                 System.out.println("\n--- User Profile ---");
-                System.out.println("Username:  " + user.username());
-                System.out.println("Full Name: " + user.fullName());
-                System.out.println("Email:     " + user.email());
+                System.out.println(user.format());
 
-                var assignments = system.getAssignmentManager().findByUser(user);
-                System.out.println("Roles:     " + (assignments.isEmpty() ? "None" : ""));
-                assignments.forEach(a -> System.out.println("  - " + a.role().getName() +
-                        (a.isActive() ? " [ACTIVE]" : " [INACTIVE]")));
+                var userAssignments = system.getAssignmentManager().findAll().stream()
+                        .filter(a -> a.user().username().equals(user.username()))
+                        .toList();
+
+                System.out.println("Roles: " + (userAssignments.isEmpty() ? "None" : ""));
+                userAssignments.forEach(a -> System.out.println("  - " + a.role().getName()));
 
                 var permissions = system.getAssignmentManager().getUserPermissions(user);
-                System.out.println("Permissions: " + (permissions.isEmpty() ? "None" : ""));
+                System.out.println("Total Permissions: " + permissions.size());
                 permissions.forEach(p -> System.out.println("  * " + p.name() + " on " + p.resource()));
 
             }, () -> System.out.println("Error: User not found."));
         });
+
+        parser.registerCommand("user-update", "Update user information", (scanner, system) -> {
+            System.out.print("Enter username to update: ");
+            String username = scanner.next();
+
+            if (system.getUserManager().exists(username)) {
+                System.out.print("Enter new full name: ");
+                scanner.nextLine();
+                String newFullName = scanner.nextLine();
+
+                System.out.print("Enter new email: ");
+                String newEmail = scanner.next();
+
+                try {
+                    system.getUserManager().update(username, newFullName, newEmail);
+                    System.out.println("Success: User information updated.");
+                } catch (IllegalArgumentException e) {
+                    System.out.println("Update Error: " + e.getMessage());
+                }
+            } else {
+                System.out.println("Error: User with username '" + username + "' not found.");
+            }
+        });
+
+        parser.registerCommand("user-delete", "Remove user and their assignments", (scanner, system) -> {
+            System.out.print("Enter username to delete: ");
+            String username = scanner.next();
+
+            system.getUserManager().findById(username).ifPresentOrElse(user -> {
+                System.out.print("Are you sure you want to delete user '" + username + "'? (yes/no): ");
+                String confirmation = scanner.next();
+
+                if (confirmation.equalsIgnoreCase("yes")) {
+                    system.getAssignmentManager().revokeAllForUser(user);
+
+                    system.getUserManager().remove(user);
+                    System.out.println("Success: User and all associated assignments removed.");
+                } else {
+                    System.out.println("Deletion cancelled.");
+                }
+            }, () -> System.out.println("Error: User not found."));
+        });
+
+        parser.registerCommand("user-search", "Search users by filters", (scanner, system) -> {
+            System.out.println("\n--- Search Menu ---");
+            System.out.println("1. By username (contains)");
+            System.out.println("2. By email (exact)");
+            System.out.println("3. By email domain (e.g., gmail.com)");
+            System.out.println("4. By full name (contains)");
+            System.out.print("Select filter (1-4): ");
+
+            int choice = scanner.hasNextInt() ? scanner.nextInt() : 0;
+            scanner.nextLine();
+
+            if (choice < 1 || choice > 4) {
+                System.out.println("Error: Invalid selection.");
+                return;
+            }
+
+            System.out.print("Enter search term: ");
+            String term = scanner.nextLine().trim();
+
+            try {
+                UserFilter filter = switch (choice) {
+                    case 1 -> UserFilters.byUsernameContains(term);
+                    case 2 -> UserFilters.byEmail(term);
+                    case 3 -> UserFilters.byEmailDomain(term);
+                    case 4 -> UserFilters.byFullNameContains(term);
+                    default -> null;
+                };
+
+                var results = system.getUserManager().findByFilter(filter);
+
+                if (results.isEmpty()) {
+                    System.out.println("No users found.");
+                } else {
+                    System.out.println("\nSearch Results:");
+                    results.forEach(u -> System.out.println(" - " + u.format()));
+                }
+            } catch (IllegalArgumentException e) {
+                System.out.println("Validation Error: " + e.getMessage());
+            }
+        });
+
+
+
     }
 }

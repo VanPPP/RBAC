@@ -104,7 +104,7 @@ public class AssignmentManager implements Repository<RoleAssignment> {
     public boolean userHasPermission(User user, String permissionName, String resource) {
         if (user == null || permissionName == null || resource == null) return false;
         return assignments.values().stream()
-                .filter(a -> a.user().equals(user))
+                .filter(a -> a.user().username().equals(user.username()))
                 .filter(RoleAssignment::isActive)
                 .anyMatch(a -> a.role().hasPermission(permissionName, resource));
     }
@@ -112,7 +112,7 @@ public class AssignmentManager implements Repository<RoleAssignment> {
     public Set<Permission> getUserPermissions(User user) {
         if (user == null) return Collections.emptySet();
         return assignments.values().stream()
-                .filter(a -> a.user().equals(user))
+                .filter(a -> a.user().username().equals(user.username()))
                 .filter(RoleAssignment::isActive)
                 .flatMap(a -> a.role().getPermissions().stream())
                 .collect(Collectors.toSet());
@@ -142,5 +142,10 @@ public class AssignmentManager implements Repository<RoleAssignment> {
         } else {
             throw new IllegalArgumentException("Only temporary assignments can be extended");
         }
+    }
+
+    public void revokeAllForUser(User user) {
+        if (user == null) return;
+        assignments.entrySet().removeIf(entry -> entry.getValue().user().username().equals(user.username()));
     }
 }
