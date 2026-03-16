@@ -554,5 +554,35 @@ public class CommandRegistry {
             }
         });
 
+        parser.registerCommand("report-users", "Report: Users and their roles", (scanner, system) -> {
+            String report = ReportGenerator.generateUserReport(system.getUserManager(), system.getAssignmentManager());
+            handleReportOutput(scanner, report, "users_report.txt");
+            AuditLog.log(system.getCurrentUser(), "REPORT_GEN", "Generated user-role report");
+        });
+
+        parser.registerCommand("report-roles", "Report: Role usage statistics", (scanner, system) -> {
+            String report = ReportGenerator.generateRoleReport(system.getRoleManager(), system.getAssignmentManager());
+            handleReportOutput(scanner, report, "roles_report.txt");
+            AuditLog.log(system.getCurrentUser(), "REPORT_GEN", "Generated role usage report");
+        });
+
+        parser.registerCommand("report-matrix", "Report: Permission matrix (Users x Resources)", (scanner, system) -> {
+            String report = ReportGenerator.generatePermissionMatrix(system.getUserManager(), system.getAssignmentManager());
+            handleReportOutput(scanner, report, "matrix_report.txt");
+            AuditLog.log(system.getCurrentUser(), "REPORT_GEN", "Generated permission matrix");
+        });
+
+    }
+    private static void handleReportOutput(Scanner scanner, String report, String defaultName) {
+        System.out.print("Print to console (1) or save to file (2)? ");
+        String choice = scanner.next();
+        if ("2".equals(choice)) {
+            System.out.print("Enter filename (default: " + defaultName + "): ");
+            String filename = scanner.next();
+            if (filename.equals(".")) filename = defaultName;
+            ReportGenerator.exportToFile(report, filename);
+        } else {
+            System.out.println("\n" + report);
+        }
     }
 }
