@@ -244,59 +244,52 @@ public class CommandRegistry {
         });
 
         parser.registerCommand("assign-role", "Assign a role to a user", (scanner, system) -> {
-            System.out.print("Enter username: ");
-            String username = scanner.next();
-
-            System.out.print("Enter role name: ");
-            String roleName = scanner.next();
+            String username = ConsoleUtils.promptString(scanner, "Enter username", true);
+            String roleName = ConsoleUtils.promptString(scanner, "Enter role name", true);
 
             var userOpt = system.getUserManager().findByUsername(username);
             var roleOpt = system.getRoleManager().findByName(roleName);
 
-            if (userOpt.isEmpty()) {
-                System.out.println("Error: User not found.");
-                return;
-            }
-            if (roleOpt.isEmpty()) {
-                System.out.println("Error: Role not found.");
+            if (userOpt.isEmpty() || roleOpt.isEmpty()) {
+                System.out.println("Error: User or Role not found.");
                 return;
             }
 
             User user = userOpt.get();
             Role role = roleOpt.get();
 
-            System.out.print("Assignment type (1: Permanent, 2: Temporary): ");
-            int type = scanner.nextInt();
+            int type = ConsoleUtils.promptInt(scanner, "Assignment type (1: Permanent, 2: Temporary)", 1, 2);
+            String reason = ConsoleUtils.promptString(scanner, "Reason for assignment", true);
 
-            System.out.print("Enter your name (Assigner): ");
-            String assigner = scanner.next();
+            AssignmentMetadata metadata = new AssignmentMetadata(
+                    system.getCurrentUser(),
+                    DateUtils.getCurrentDateTime(),
+                    reason
+            );
 
-            System.out.print("Reason for assignment: ");
-            scanner.nextLine();
-            String reason = scanner.nextLine();
-
-            AssignmentMetadata metadata = AssignmentMetadata.now(assigner, reason);
             RoleAssignment assignment;
 
             try {
                 if (type == 1) {
                     assignment = new PermanentAssignment(user, role, metadata);
-                } else if (type == 2) {
-                    System.out.print("Enter expiration date (YYYY-MM-DD): ");
-                    String expiryDate = scanner.next();
-                    assignment = new TemporaryAssignment(user, role, metadata, expiryDate, false);
                 } else {
-                    System.out.println("Error: Invalid assignment type.");
-                    return;
+                    System.out.println("Current Date: " + DateUtils.getCurrentDate());
+                    int days = ConsoleUtils.promptInt(scanner, "Enter duration in days", 1, 365);
+
+                    String expiryDate = DateUtils.addDays(DateUtils.getCurrentDate(), days);
+
+                    System.out.println("Calculated Expiry Date: " + expiryDate);
+                    System.out.println("Status: Role will expire " + DateUtils.formatRelativeTime(expiryDate));
+
+                    assignment = new TemporaryAssignment(user, role, metadata, expiryDate, false);
                 }
 
                 system.getAssignmentManager().add(assignment);
-                AuditLog.log(
-                        system.getCurrentUser(),
-                        "ROLE_ASSIGN",
-                        String.format("Assigned role '%s' to user '%s'", roleName, username)
-                );
-                System.out.println("Success: Role '" + roleName + "' assigned to '" + username + "' (" + assignment.assignmentType() + ").");
+
+                AuditLog.log(system.getCurrentUser(), "ROLE_ASSIGN",
+                        String.format("Assigned %s to %s", roleName, username));
+
+                System.out.println("Success: Assignment completed.");
 
             } catch (Exception e) {
                 System.out.println("Error: " + e.getMessage());

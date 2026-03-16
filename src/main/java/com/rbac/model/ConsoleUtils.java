@@ -22,6 +22,7 @@ public class ConsoleUtils {
         while (true) {
             System.out.printf("%s (%d-%d): ", message, min, max);
             String input = scanner.next();
+            if (scanner.hasNextLine()) scanner.nextLine();
             try {
                 int value = Integer.parseInt(input);
                 if (value >= min && value <= max) {
