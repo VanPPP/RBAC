@@ -3,10 +3,11 @@ package com.rbac.model;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.TreeMap;
 
 public class CommandParser {
-    private final Map<String, Command> commands = new HashMap<>();
-    private final Map<String, String> commandDescriptions = new HashMap<>();
+    private final Map<String, Command> commands = new TreeMap<>();
+    private final Map<String, String> commandDescriptions = new TreeMap<>();
 
     public void registerCommand(String name, String description, Command command) {
         commands.put(name, command);

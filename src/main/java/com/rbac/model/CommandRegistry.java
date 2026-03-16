@@ -1,6 +1,7 @@
 package com.rbac.model;
 
 import java.util.Scanner;
+import java.util.ArrayList;
 
 public class CommandRegistry {
     public static void registerAll(CommandParser parser) {
@@ -411,6 +412,112 @@ public class CommandRegistry {
                 System.exit(0);
             } else {
                 System.out.println("Exit aborted.");
+            }
+        });
+
+        parser.registerCommand("role-add-permission", "Add permission to a role", (scanner, system) -> {
+            System.out.print("Enter role name: ");
+            String roleName = scanner.next();
+
+            if (!system.getRoleManager().exists(roleName)) {
+                System.out.println("Error: Role not found.");
+                return;
+            }
+
+            System.out.print("Permission name (e.g., READ): ");
+            String pName = scanner.next();
+            System.out.print("Resource (e.g., system): ");
+            String pRes = scanner.next();
+            System.out.print("Description: ");
+            scanner.nextLine();
+            String pDesc = scanner.nextLine();
+
+            try {
+                Permission permission = new Permission(pName, pRes, pDesc);
+                system.getRoleManager().addPermissionToRole(roleName, permission);
+                System.out.println("Success: Permission added to role '" + roleName + "'.");
+            } catch (Exception e) {
+                System.out.println("Error: " + e.getMessage());
+            }
+        });
+
+        parser.registerCommand("role-remove-permission", "Remove permission from a role", (scanner, system) -> {
+            System.out.print("Enter role name: ");
+            String roleName = scanner.next();
+
+            system.getRoleManager().findByName(roleName).ifPresentOrElse(role -> {
+                var permissions = new ArrayList<>(role.getPermissions());
+                if (permissions.isEmpty()) {
+                    System.out.println("Role has no permissions.");
+                    return;
+                }
+
+                System.out.println("\nPermissions for " + roleName + ":");
+                for (int i = 0; i < permissions.size(); i++) {
+                    System.out.printf("%d. %s%n", i + 1, permissions.get(i).format());
+                }
+
+                System.out.print("Select permission number to remove: ");
+                int index = scanner.nextInt() - 1;
+
+                if (index >= 0 && index < permissions.size()) {
+                    role.removePermission(permissions.get(index));
+                    System.out.println("Success: Permission removed.");
+                } else {
+                    System.out.println("Invalid selection.");
+                }
+            }, () -> System.out.println("Error: Role not found."));
+        });
+
+        parser.registerCommand("role-search", "Search roles by different criteria", (scanner, system) -> {
+            System.out.println("Search by: 1. Name contains, 2. Has permission, 3. Min permissions count");
+            System.out.print("Choice: ");
+
+            if (!scanner.hasNextInt()) {
+                System.out.println("Error: Invalid input. Please enter a number (1-3).");
+                scanner.next();
+                return;
+            }
+            int choice = scanner.nextInt();
+
+            var allRoles = system.getRoleManager().findAll();
+            java.util.List<Role> results = new java.util.ArrayList<>();
+
+            switch (choice) {
+                case 1 -> {
+                    System.out.print("Enter partial name: ");
+                    String part = scanner.next().toLowerCase();
+                    results = allRoles.stream()
+                            .filter(r -> r.getName().toLowerCase().contains(part))
+                            .toList();
+                }
+                case 2 -> {
+                    System.out.print("Permission name: ");
+                    String pName = scanner.next();
+                    System.out.print("Resource: ");
+                    String pRes = scanner.next();
+                    results = system.getRoleManager().findRolesWithPermission(pName, pRes);
+                }
+                case 3 -> {
+                    System.out.print("Enter minimum count: ");
+                    if (!scanner.hasNextInt()) {
+                        System.out.println("Error: Count must be a number!");
+                        scanner.next();
+                        return;
+                    }
+                    int min = scanner.nextInt();
+                    results = allRoles.stream()
+                            .filter(r -> r.getPermissions().size() >= min)
+                            .toList();
+                }
+                default -> System.out.println("Invalid choice.");
+            }
+
+            if (!results.isEmpty()) {
+                System.out.println("\nSearch Results:");
+                results.forEach(r -> System.out.println("- " + r.getName() + " (Permissions: " + r.getPermissions().size() + ")"));
+            } else if (choice >= 1 && choice <= 3) {
+                System.out.println("No roles found matching the criteria.");
             }
         });
 
