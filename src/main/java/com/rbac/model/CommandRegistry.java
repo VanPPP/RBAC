@@ -12,13 +12,16 @@ public class CommandRegistry {
         parser.registerCommand("user-list", "Show all users", (scanner, system) -> {
             var users = system.getUserManager().findAll();
             if (users.isEmpty()) {
-                System.out.println("No users found.");
+                System.out.println(FormatUtils.formatBox("No users found in the system."));
             } else {
-                System.out.println("\n=== User List ===");
-                System.out.printf("%-15s | %-20s | %-25s%n", "Username", "Full Name", "Email");
-                System.out.println("------------------------------------------------------------");
-                users.forEach(u -> System.out.printf("%-15s | %-20s | %-25s%n",
-                        u.username(), u.fullName(), u.email()));
+                System.out.println(FormatUtils.formatHeader("Global User List"));
+
+                String[] headers = {"Username", "Full Name", "Email"};
+                java.util.List<String[]> rows = users.stream()
+                        .map(u -> new String[]{u.username(), u.fullName(), u.email()})
+                        .toList();
+
+                System.out.println(FormatUtils.formatTable(headers, rows));
             }
         });
 
@@ -47,7 +50,7 @@ public class CommandRegistry {
             String username = scanner.next();
 
             system.getUserManager().findByUsername(username).ifPresentOrElse(user -> {
-                System.out.println("\n--- User Profile ---");
+                System.out.println(FormatUtils.formatHeader("User Profile: " + user.username()));
                 System.out.println(user.format());
 
                 var activeFilter = AssignmentFilters.byUsername(username)
@@ -150,22 +153,22 @@ public class CommandRegistry {
 
         parser.registerCommand("role-list", "Show all roles", (scanner, system) -> {
             var roles = system.getRoleManager().findAll();
-
             if (roles.isEmpty()) {
-                System.out.println("No roles found in the system.");
+                System.out.println(FormatUtils.formatBox("No roles found in the system."));
             } else {
                 roles.sort(RoleSorters.byName());
+                System.out.println(FormatUtils.formatHeader("System Roles"));
 
-                System.out.println("\n=== Role List ===");
-                System.out.printf("%-20s | %-12s | %-36s%n", "Role Name", "Permissions", "ID");
-                System.out.println("----------------------------------------------------------------------------");
+                String[] headers = {"Role Name", "Permissions Count", "Role ID"};
+                java.util.List<String[]> rows = roles.stream()
+                        .map(r -> new String[]{
+                                r.getName(),
+                                String.valueOf(r.getPermissions().size()),
+                                r.getId()
+                        })
+                        .toList();
 
-                roles.forEach(role -> {
-                    System.out.printf("%-20s | %-12d | %-36s%n",
-                            role.getName(),
-                            role.getPermissions().size(),
-                            role.getId());
-                });
+                System.out.println(FormatUtils.formatTable(headers, rows));
             }
         });
 
@@ -369,35 +372,31 @@ public class CommandRegistry {
 
         parser.registerCommand("assignments-list", "Show all role assignments", (scanner, system) -> {
             var assignments = system.getAssignmentManager().findAll();
-
             if (assignments.isEmpty()) {
-                System.out.println("No assignments in the system.");
+                System.out.println(FormatUtils.formatBox("No assignments found."));
                 return;
             }
 
-            System.out.println("\n" + "=".repeat(95));
-            System.out.printf("%-15s | %-15s | %-12s | %-10s | %-25s%n",
-                    "USERNAME", "ROLE", "TYPE", "STATUS", "ASSIGNED AT");
-            System.out.println("-".repeat(95));
+            System.out.println(FormatUtils.formatHeader("System Role Assignments"));
 
-            assignments.stream()
+            String[] headers = {"Username", "Role", "Type", "Status", "Date"};
+            java.util.List<String[]> rows = assignments.stream()
                     .sorted(AssignmentSorters.byUsername())
-                    .forEach(a -> {
-                        String status = a.isActive() ? "ACTIVE" : "INACTIVE";
+                    .map(a -> {
+                        String type = a.assignmentType();
+                        if (a instanceof TemporaryAssignment ta) type += " (to " + ta.getExpiresAt() + ")";
 
-                        String typeDisplay = a.assignmentType();
-                        if (a instanceof TemporaryAssignment ta) {
-                            typeDisplay += " (" + ta.getExpiresAt() + ")";
-                        }
-
-                        System.out.printf("%-15s | %-15s | %-12s | %-10s | %-25s%n",
+                        return new String[]{
                                 a.user().username(),
                                 a.role().getName(),
-                                typeDisplay,
-                                status,
-                                a.metadata().assignedAt());
-                    });
-            System.out.println("=".repeat(95));
+                                type,
+                                a.isActive() ? "ACTIVE" : "EXPIRED",
+                                a.metadata().assignedAt()
+                        };
+                    })
+                    .toList();
+
+            System.out.println(FormatUtils.formatTable(headers, rows));
         });
 
         parser.registerCommand("help", "Show all available commands", (scanner, system) -> {
@@ -405,6 +404,7 @@ public class CommandRegistry {
         });
 
         parser.registerCommand("stats", "Show system statistics", (scanner, system) -> {
+            System.out.println(FormatUtils.formatHeader("System Statistics"));
             System.out.println(system.generateStatistics());
         });
 
