@@ -3,6 +3,8 @@ package com.rbac.model;
 import java.util.Scanner;
 import java.util.ArrayList;
 import com.rbac.model.AuditLog;
+import com.rbac.model.ConsoleUtils;
+import com.rbac.model.ValidationUtils;
 
 public class CommandRegistry {
     public static void registerAll(CommandParser parser) {
@@ -20,26 +22,21 @@ public class CommandRegistry {
             }
         });
 
-        parser.registerCommand("user-create", "Create a new user", (scanner, system) -> {
-            System.out.print("Enter username: ");
-            String username = scanner.next();
+        parser.registerCommand("user-create", "Create a new user (Wizard)", (scanner, system) -> {
+            String username = ConsoleUtils.promptString(scanner, "Enter username", true);
+            String fullName = ConsoleUtils.promptString(scanner, "Enter full name", true);
+            String email = ConsoleUtils.promptString(scanner, "Enter email", true);
 
-            System.out.print("Enter full name: ");
-            scanner.nextLine();
-            String fullName = scanner.nextLine();
-
-            System.out.print("Enter email: ");
-            String email = scanner.next();
+            if (!ValidationUtils.isValidUsername(username) || !ValidationUtils.isValidEmail(email)) {
+                System.out.println("Error: Invalid username or email format.");
+                return;
+            }
 
             try {
                 User newUser = User.create(username, fullName, email);
                 system.getUserManager().add(newUser);
-                AuditLog.log(
-                        system.getCurrentUser(),
-                        "USER_CREATE",
-                        "Created user: " + username + " (" + email + ")"
-                );
-                System.out.println("Success: User created successfully.");
+                AuditLog.log(system.getCurrentUser(), "USER_CREATE", "Username: " + username);
+                System.out.println("Success: User created.");
             } catch (Exception e) {
                 System.out.println("Error: " + e.getMessage());
             }
@@ -74,16 +71,11 @@ public class CommandRegistry {
         });
 
         parser.registerCommand("user-update", "Update user information", (scanner, system) -> {
-            System.out.print("Enter username to update: ");
-            String username = scanner.next();
+            String username = ConsoleUtils.promptString(scanner, "Enter username to update", true);
 
             if (system.getUserManager().exists(username)) {
-                System.out.print("Enter new full name: ");
-                scanner.nextLine();
-                String newFullName = scanner.nextLine();
-
-                System.out.print("Enter new email: ");
-                String newEmail = scanner.next();
+                String newFullName = ConsoleUtils.promptString(scanner, "Enter new full name", false);
+                String newEmail = ConsoleUtils.promptString(scanner, "Enter new email", false);
 
                 try {
                     system.getUserManager().update(username, newFullName, newEmail);
@@ -99,14 +91,11 @@ public class CommandRegistry {
         });
 
         parser.registerCommand("user-delete", "Remove user and their assignments", (scanner, system) -> {
-            System.out.print("Enter username to delete: ");
-            String username = scanner.next();
+            String username = ConsoleUtils.promptString(scanner, "Enter username to delete", true);
 
             system.getUserManager().findById(username).ifPresentOrElse(user -> {
-                System.out.print("Are you sure you want to delete user '" + username + "'? (yes/no): ");
-                String confirmation = scanner.next();
 
-                if (confirmation.equalsIgnoreCase("yes")) {
+                if (ConsoleUtils.promptYesNo(scanner, "Are you sure you want to delete user '" + username + "'?")) {
                     system.getAssignmentManager().revokeAllForUser(user);
 
                     system.getUserManager().remove(user);
