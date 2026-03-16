@@ -2,6 +2,7 @@ package com.rbac.model;
 
 import java.util.Scanner;
 import java.util.ArrayList;
+import com.rbac.model.AuditLog;
 
 public class CommandRegistry {
     public static void registerAll(CommandParser parser) {
@@ -33,6 +34,11 @@ public class CommandRegistry {
             try {
                 User newUser = User.create(username, fullName, email);
                 system.getUserManager().add(newUser);
+                AuditLog.log(
+                        system.getCurrentUser(),
+                        "USER_CREATE",
+                        "Created user: " + username + " (" + email + ")"
+                );
                 System.out.println("Success: User created successfully.");
             } catch (Exception e) {
                 System.out.println("Error: " + e.getMessage());
@@ -81,6 +87,8 @@ public class CommandRegistry {
 
                 try {
                     system.getUserManager().update(username, newFullName, newEmail);
+                    AuditLog.log(system.getCurrentUser(), "USER_UPDATE",
+                            String.format("Updated user: %s New data: %s, %s", username, newFullName, newEmail));
                     System.out.println("Success: User information updated.");
                 } catch (IllegalArgumentException e) {
                     System.out.println("Update Error: " + e.getMessage());
@@ -102,6 +110,7 @@ public class CommandRegistry {
                     system.getAssignmentManager().revokeAllForUser(user);
 
                     system.getUserManager().remove(user);
+                    AuditLog.log(system.getCurrentUser(), "USER_DELETE", "Deleted user: " + username);
                     System.out.println("Success: User and all associated assignments removed.");
                 } else {
                     System.out.println("Deletion cancelled.");
@@ -290,6 +299,11 @@ public class CommandRegistry {
                 }
 
                 system.getAssignmentManager().add(assignment);
+                AuditLog.log(
+                        system.getCurrentUser(),
+                        "ROLE_ASSIGN",
+                        String.format("Assigned role '%s' to user '%s'", roleName, username)
+                );
                 System.out.println("Success: Role '" + roleName + "' assigned to '" + username + "' (" + assignment.assignmentType() + ").");
 
             } catch (Exception e) {
@@ -340,15 +354,22 @@ public class CommandRegistry {
             RoleAssignment selected = activeAssignments.get(choice - 1);
 
             try {
+                String actionType = "UNKNOWN";
+
                 if (selected instanceof PermanentAssignment) {
                     system.getAssignmentManager().revokeAssignment(selected.assignmentId());
+                    actionType = "PERMANENT_REVOKE";
                     System.out.println("Success: Permanent role '" + selected.role().getName() + "' revoked.");
                 }
                 else if (selected instanceof TemporaryAssignment ta) {
                     String pastDate = java.time.LocalDate.now().minusDays(1).toString();
                     system.getAssignmentManager().extendTemporaryAssignment(selected.assignmentId(), pastDate);
+                    actionType = "TEMPORARY_EXPIRE_MANUAL";
                     System.out.println("Success: Temporary role '" + selected.role().getName() + "' expired manually.");
                 }
+
+                AuditLog.log(system.getCurrentUser(), "ROLE_REVOKE",
+                        String.format("[%s] Role: %s, User: %s", actionType, selected.role().getName(), username));
 
                 System.out.println("Original " + selected.metadata().format());
 
@@ -435,6 +456,8 @@ public class CommandRegistry {
             try {
                 Permission permission = new Permission(pName, pRes, pDesc);
                 system.getRoleManager().addPermissionToRole(roleName, permission);
+                AuditLog.log(system.getCurrentUser(), "PERMISSION_ADD",
+                        String.format("Added permission %s:%s to role %s", pName, pRes, roleName));
                 System.out.println("Success: Permission added to role '" + roleName + "'.");
             } catch (Exception e) {
                 System.out.println("Error: " + e.getMessage());
@@ -518,6 +541,16 @@ public class CommandRegistry {
                 results.forEach(r -> System.out.println("- " + r.getName() + " (Permissions: " + r.getPermissions().size() + ")"));
             } else if (choice >= 1 && choice <= 3) {
                 System.out.println("No roles found matching the criteria.");
+            }
+        });
+
+        parser.registerCommand("audit-view", "Show system audit logs", (scanner, system) -> {
+            var logs = AuditLog.getLogs();
+            if (logs.isEmpty()) {
+                System.out.println("Audit log is empty.");
+            } else {
+                System.out.println("\n=== System Audit Logs ===");
+                logs.forEach(log -> System.out.println(log.toString()));
             }
         });
 
