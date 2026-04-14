@@ -2,26 +2,28 @@ package com.rbac.model;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class AssignmentManager implements Repository<RoleAssignment> {
-    private final Map<String, RoleAssignment> assignments = new HashMap<>();
+    private final Map<String, RoleAssignment> assignments = new ConcurrentHashMap<>();
 
     @Override
     public void add(RoleAssignment assignment) {
-        if (assignment == null) {
-            throw new IllegalArgumentException("Assignment cannot be null");
+        if (assignment == null) throw new IllegalArgumentException("Assignment cannot be null");
+
+        synchronized (assignments) {
+            if (assignments.containsKey(assignment.assignmentId())) {
+                throw new IllegalArgumentException("Assignment ID already exists");
+            }
+            boolean alreadyHasActiveRole = assignments.values().stream()
+                    .anyMatch(a -> a.user().equals(assignment.user()) &&
+                            a.role().equals(assignment.role()) &&
+                            a.isActive());
+            if (alreadyHasActiveRole) {
+                throw new IllegalStateException("User already has this role active");
+            }
+            assignments.put(assignment.assignmentId(), assignment);
         }
-        if (assignments.containsKey(assignment.assignmentId())) {
-            throw new IllegalArgumentException("Assignment ID already exists");
-        }
-        boolean alreadyHasActiveRole = assignments.values().stream()
-                .anyMatch(a -> a.user().equals(assignment.user()) &&
-                        a.role().equals(assignment.role()) &&
-                        a.isActive());
-        if (alreadyHasActiveRole) {
-            throw new IllegalStateException("User already has this role active");
-        }
-        assignments.put(assignment.assignmentId(), assignment);
     }
 
     @Override
