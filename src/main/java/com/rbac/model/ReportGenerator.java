@@ -13,14 +13,17 @@ public class ReportGenerator {
         sb.append(String.format("%-15s | %-30s\n", "Username", "Active Roles"));
         sb.append("-".repeat(48)).append("\n");
 
-        userManager.findAll().forEach(user -> {
-            String roles = assignmentManager.findAll().stream()
-                    .filter(a -> a.user().equals(user) && a.isActive())
-                    .map(a -> a.role().getName())
-                    .collect(Collectors.joining(", "));
+        String rows = userManager.findAll().parallelStream()
+                .map(user -> {
+                    String roles = assignmentManager.findAll().stream()
+                            .filter(a -> a.user().equals(user) && a.isActive())
+                            .map(a -> a.role().getName())
+                            .collect(Collectors.joining(", "));
+                    return String.format("%-15s | %s", user.username(), roles.isEmpty() ? "No roles" : roles);
+                })
+                .collect(Collectors.joining("\n"));
 
-            sb.append(String.format("%-15s | %s\n", user.username(), roles.isEmpty() ? "No roles" : roles));
-        });
+        sb.append(rows).append("\n");
         return sb.toString();
     }
 
@@ -55,16 +58,20 @@ public class ReportGenerator {
         resources.forEach(res -> sb.append(String.format(" | %-10s", res)));
         sb.append("\n").append("-".repeat(15 + resources.size() * 13)).append("\n");
 
-        userManager.findAll().forEach(user -> {
-            sb.append(String.format("%-15s", user.username()));
-            Set<Permission> userPerms = assignmentManager.getUserPermissions(user);
+        String matrix = userManager.findAll().parallelStream()
+                .map(user -> {
+                    StringBuilder row = new StringBuilder(String.format("%-15s", user.username()));
+                    Set<Permission> userPerms = assignmentManager.getUserPermissions(user);
 
-            resources.forEach(res -> {
-                boolean hasAccess = userPerms.stream().anyMatch(p -> p.resource().equals(res));
-                sb.append(String.format(" | %-10s", hasAccess ? "[ X ]" : "[   ]"));
-            });
-            sb.append("\n");
-        });
+                    resources.forEach(res -> {
+                        boolean hasAccess = userPerms.stream().anyMatch(p -> p.resource().equals(res));
+                        row.append(String.format(" | %-10s", hasAccess ? "[ X ]" : "[   ]"));
+                    });
+                    return row.toString();
+                })
+                .collect(Collectors.joining("\n"));
+
+        sb.append(matrix).append("\n");
         return sb.toString();
     }
 
@@ -73,7 +80,7 @@ public class ReportGenerator {
             out.println(report);
             System.out.println("Success: Report saved to " + filename);
         } catch (Exception e) {
-            System.err.println("Export error: " + e.getMessage());
+            System.out.println("Error saving report: " + e.getMessage());
         }
     }
 }

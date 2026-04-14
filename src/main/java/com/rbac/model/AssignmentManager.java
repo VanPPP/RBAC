@@ -71,6 +71,13 @@ public class AssignmentManager implements Repository<RoleAssignment> {
                 .collect(Collectors.toList());
     }
 
+    public List<RoleAssignment> findByFilterParallel(java.util.function.Predicate<RoleAssignment> filter) {
+        if (filter == null) return findAll();
+        return assignments.values().parallelStream()
+                .filter(filter)
+                .collect(Collectors.toList());
+    }
+
     public List<RoleAssignment> findAll(AssignmentFilter filter, Comparator<RoleAssignment> sorter) {
         List<RoleAssignment> result = findByFilter(filter);
 
