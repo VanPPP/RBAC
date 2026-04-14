@@ -3,29 +3,23 @@ package com.rbac.model;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class RoleManager implements Repository<Role> {
-    private final Map<String, Role> rolesById = new HashMap<>();
-    private final Map<String, Role> rolesByName = new HashMap<>();
+    private final Map<String, Role> rolesById = new ConcurrentHashMap<>();
+    private final Map<String, Role> rolesByName = new ConcurrentHashMap<>();
 
-    private Predicate<Role> hasAssignments = null;
+    private volatile Predicate<Role> hasAssignments = null;
 
     public void setHasAssignmentsChecker(Predicate<Role> checker) {
         this.hasAssignments = checker;
     }
 
     @Override
-    public void add(Role role) {
-        if (role == null) {
-            throw new IllegalArgumentException("Role cannot be null");
-        }
-
-        if (rolesById.containsKey(role.getId())) {
-            throw new IllegalArgumentException("Role ID already exists");
-        }
-
-        if (rolesByName.containsKey(role.getName())) {
-            throw new IllegalArgumentException("Role name '" + role.getName() + "' already exists");
+    public synchronized void add(Role role) {
+        if (role == null) throw new IllegalArgumentException("Role cannot be null");
+        if (rolesById.containsKey(role.getId()) || rolesByName.containsKey(role.getName())) {
+            throw new IllegalArgumentException("Role already exists");
         }
 
         rolesById.put(role.getId(), role);
@@ -33,19 +27,14 @@ public class RoleManager implements Repository<Role> {
     }
 
     @Override
-    public boolean remove(Role role) {
+    public synchronized boolean remove(Role role) {
         if (role == null) return false;
-
         if (hasAssignments != null && hasAssignments.test(role)) {
             throw new IllegalStateException("Cannot remove role that is assigned to users");
         }
 
-        Role removed = rolesById.remove(role.getId());
-        if (removed != null) {
-            rolesByName.remove(role.getName());
-            return true;
-        }
-        return false;
+        rolesByName.remove(role.getName());
+        return rolesById.remove(role.getId()) != null;
     }
 
     @Override
