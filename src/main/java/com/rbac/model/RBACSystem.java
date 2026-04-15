@@ -1,12 +1,16 @@
 package com.rbac.model;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class RBACSystem {
     private final UserManager userManager;
     private final RoleManager roleManager;
     private final AssignmentManager assignmentManager;
     private String currentUser;
+
+    private final ExecutorService backgroundExecutor = Executors.newFixedThreadPool(4);
 
     public RBACSystem() {
         this.userManager = new UserManager();
@@ -16,6 +20,14 @@ public class RBACSystem {
         this.roleManager.setHasAssignmentsChecker(role ->
                 !assignmentManager.findByRole(role).isEmpty()
         );
+    }
+
+    public void executeAsync(Runnable task) {
+        backgroundExecutor.execute(task);
+    }
+
+    public void shutdown() {
+        backgroundExecutor.shutdown();
     }
 
     public UserManager getUserManager() { return userManager; }

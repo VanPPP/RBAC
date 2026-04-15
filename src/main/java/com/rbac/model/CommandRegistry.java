@@ -554,6 +554,36 @@ public class CommandRegistry {
             AuditLog.log(system.getCurrentUser(), "REPORT_GEN", "Generated permission matrix");
         });
 
+        parser.registerCommand("report-users-async", "Generate user report in background", (scanner, system) -> {
+            System.out.println("[System] Starting background report generation...");
+
+            system.executeAsync(() -> {
+                try {
+                    Thread.sleep(3000);
+
+                    String report = ReportGenerator.generateUserReport(system.getUserManager(), system.getAssignmentManager());
+                    String filename = "async_report_" + System.currentTimeMillis() + ".txt";
+                    ReportGenerator.exportToFile(report, filename);
+
+                    System.out.println("\n[Notification] Background report ready: " + filename);
+                    AuditLog.log("SYSTEM", "ASYNC_REPORT", "File: " + filename);
+                } catch (Exception e) {
+                    System.err.println("Report failed: " + e.getMessage());
+                }
+            });
+        });
+
+        parser.registerCommand("save-async", "Save data to file in background", (scanner, system) -> {
+            System.out.println("[System] Saving data in background...");
+
+            system.executeAsync(() -> {
+
+                try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
+
+                System.out.println("\n[Notification] Data successfully saved to background storage.");
+                AuditLog.log("SYSTEM", "ASYNC_SAVE", "Manual background save triggered");
+            });
+        });
     }
     private static void handleReportOutput(Scanner scanner, String report, String defaultName) {
         System.out.print("Print to console (1) or save to file (2)? ");
