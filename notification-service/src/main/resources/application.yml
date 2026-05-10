@@ -1,0 +1,26 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: notification-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5434}/${DB_NAME:taxi_notification}
+    username: ${DB_USER:taxi}
+    password: ${DB_PASSWORD:taxi}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+taxi:
+  jwt:
+    secret: ${JWT_SECRET:taxi-dev-secret-key-min-32-chars-long!!}
+  internal:
+    api-key: ${INTERNAL_API_KEY:dev-internal-key}
+  notification:
+    worker-threads: 4

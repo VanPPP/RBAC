@@ -1,0 +1,111 @@
+services:
+  postgres-user:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: taxi
+      POSTGRES_PASSWORD: taxi
+      POSTGRES_DB: taxi_user
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taxi -d taxi_user"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-trip:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: taxi
+      POSTGRES_PASSWORD: taxi
+      POSTGRES_DB: taxi_trip
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taxi -d taxi_trip"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-notification:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: taxi
+      POSTGRES_PASSWORD: taxi
+      POSTGRES_DB: taxi_notification
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taxi -d taxi_notification"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  user-service:
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
+    depends_on:
+      postgres-user:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "8081:8081"
+    environment:
+      DB_HOST: postgres-user
+      DB_PORT: 5432
+      DB_NAME: taxi_user
+      DB_USER: taxi
+      DB_PASSWORD: taxi
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: taxi-dev-secret-key-min-32-chars-long!!
+      INTERNAL_API_KEY: dev-internal-key
+
+  trip-service:
+    build:
+      context: .
+      dockerfile: trip-service/Dockerfile
+    depends_on:
+      postgres-trip:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
+    ports:
+      - "8082:8082"
+    environment:
+      DB_HOST: postgres-trip
+      DB_PORT: 5432
+      DB_NAME: taxi_trip
+      DB_USER: taxi
+      DB_PASSWORD: taxi
+      USER_SERVICE_URL: http://user-service:8081
+      NOTIFICATION_SERVICE_URL: http://notification-service:8083
+      JWT_SECRET: taxi-dev-secret-key-min-32-chars-long!!
+      INTERNAL_API_KEY: dev-internal-key
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    depends_on:
+      postgres-notification:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+    environment:
+      DB_HOST: postgres-notification
+      DB_PORT: 5432
+      DB_NAME: taxi_notification
+      DB_USER: taxi
+      DB_PASSWORD: taxi
+      JWT_SECRET: taxi-dev-secret-key-min-32-chars-long!!
+      INTERNAL_API_KEY: dev-internal-key

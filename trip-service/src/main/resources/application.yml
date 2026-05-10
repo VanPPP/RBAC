@@ -1,0 +1,30 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: trip-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:taxi_trip}
+    username: ${DB_USER:taxi}
+    password: ${DB_PASSWORD:taxi}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+taxi:
+  jwt:
+    secret: ${JWT_SECRET:taxi-dev-secret-key-min-32-chars-long!!}
+  internal:
+    api-key: ${INTERNAL_API_KEY:dev-internal-key}
+  user-service:
+    base-url: ${USER_SERVICE_URL:http://localhost:8081}
+  notification-service:
+    base-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8083}
+  pricing:
+    tariff-per-km: 50
